@@ -1,0 +1,8 @@
+INGR_MAP = 'data/ingr_map.pkl'
+INTER_TEST = 'data/interactions_test.csv'
+INTER_TRAIN = 'data/interactions_train.csv'
+INTER_VAL = 'data/interactions_validation.csv'
+PP_RECI = 'data/PP_recipes.csv'
+PP_USER = 'data/PP_users.csv'
+RAW_INTER = 'data/RAW_interactions.csv'
+RAW_RECI = 'data/RAW_recipes.csv'
