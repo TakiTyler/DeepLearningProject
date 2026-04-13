@@ -3,3 +3,7 @@ __pycache__
 
 # ignore the data folder
 data
+
+# ignore env files
+.env
+.venv
