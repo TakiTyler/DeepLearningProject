@@ -6,7 +6,7 @@ def parse_list_column(text):
         return []
     try:
         parsed = ast.literal_eval(text)
-        
+
         if isinstance(parsed, list):
             return parsed
         else:

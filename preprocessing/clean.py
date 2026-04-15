@@ -1,4 +1,4 @@
-# This file contains functions to clean the recipe data before feeding it into the model. 
+# This file contains functions to clean the recipe data before feeding it into the model.
 # This includes normalizing ingredients and steps, as well as filtering out bad recipes.
 
 def clean_ingredients(ingredients_list):
@@ -21,7 +21,6 @@ def clean_ingredients(ingredients_list):
 
     return cleaned
 
-
 def clean_steps(steps_list):
     """
     Clean recipe steps:
@@ -42,7 +41,6 @@ def clean_steps(steps_list):
             cleaned.append(step)
 
     return cleaned
-
 
 def is_valid_recipe(ingredients, steps):
     """

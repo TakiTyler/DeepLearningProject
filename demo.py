@@ -6,7 +6,7 @@ from preprocessing.clean import clean_ingredients, clean_steps, is_valid_recipe
 
 # helper function to load CSVs for use in other functions
 def load_csv(csv: str):
-    if not os.path.exists(csv): 
+    if not os.path.exists(csv):
         raise ValueError('Input a proper CSV file location.')
     df = pd.read_csv(csv)
     return df
@@ -39,12 +39,10 @@ def demo_cleaning(df):
     print("VALID:", is_valid_recipe(ingredients, steps))
     print()
 
-
-if __name__ == '__main__':
-    df = load_csv(RAW_RECI)
+# if __name__ == '__main__':
+    # df = load_csv(RAW_RECI)
     '''
     # demo parsing and cleaning on first recipe
     demo_parsing(df)
     demo_cleaning(df)
     '''
-    
