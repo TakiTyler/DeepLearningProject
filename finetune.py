@@ -1,85 +1,48 @@
-import os
+import argparse
 import torch
-import pandas as pd
 from datasets import Dataset
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     BitsAndBytesConfig,
-    TrainingArguments
+    TrainingArguments,
 )
 from peft import LoraConfig, prepare_model_for_kbit_training, get_peft_model
 from trl import SFTTrainer
 
-from constants import *
-from demo import load_csv
-from preprocessing.parse import parse_ingredients, parse_steps
-from preprocessing.clean import clean_ingredients, clean_steps, is_valid_recipe
+from splits import build_splits
+from inference import build_prompt
 
-# install the above with: pip install -U torch transformers peft trl bitsandbytes datasets pandas
-# python.exe -m pip install --upgrade pip
+# install deps with: pip install -U torch transformers peft trl bitsandbytes datasets pandas scikit-learn sacrebleu
 
-def prepare_dataset(csv_path: str, num_samples: int = 50000):
-    # """Loads, cleans, and formats the dataset for Hugging Face."""
-    """Loads, cleans, and formats the dataset for Hugging Face.
 
-    Args:
-        csv_path (str): Path to the recipe dataset.
-        num_samples (int, optional): Number of samples to load. Defaults to 50000 based on project proposal.
+def _format_for_sft(ds):
+    """Turn a split from `splits.build_splits` into a {'text': [...]} SFT dataset."""
+    texts = [
+        build_prompt(ex["ingredients"], target_name=ex["name"], target_steps=ex["steps"])
+        for ex in ds
+    ]
+    return Dataset.from_dict({"text": texts})
 
-    Returns:
-        Dataset: The filtered and formatted dataset.
-    """
-    print("--- loading and preprocessing dataset ---")
-    df = load_csv(csv_path)
-
-    formatted_data = {"text": []}
-    valid_count = 0
-
-    for _, row in df.iterrows():
-        if valid_count >= num_samples:
-            break
-
-        ingredients = parse_ingredients(row['ingredients'])
-        steps = parse_steps(row['steps'])
-
-        ingredients = clean_ingredients(ingredients)
-        steps = clean_steps(steps)
-
-        if not is_valid_recipe(ingredients, steps):
-            continue
-
-        # convert lists to strings for the prompt
-        ingr_str = ", ".join(ingredients)
-        steps_str = " ".join([f"{i+1}. {step.capitalize()}" for i, step in enumerate(steps)])
-        recipe_name = str(row['name']).title()
-
-        # gemma chat template formatting
-        prompt = (
-            f"<start_of_turn>user\n"
-            f"I have the following ingredients: {ingr_str}. What recipe can I make with these? Provide the name and steps.\n<end_of_turn>\n"
-            f"<start_of_turn>model\n"
-            f"**Recipe Name:** {recipe_name}\n"
-            f"**Steps:**\n{steps_str}\n<end_of_turn>"
-        )
-
-        formatted_data["text"].append(prompt)
-        valid_count += 1
-
-    print(f"Prepared {len(formatted_data['text'])} valid recipes.")
-    return Dataset.from_dict(formatted_data)
 
 def main():
-    rank = 4 # change to modify the rank of QLoRA
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--rank", type=int, default=4, help="QLoRA rank (ablation: 4, 16, 64)")
+    parser.add_argument("--num_samples", type=int, default=50000)
+    parser.add_argument("--epochs", type=int, default=1)
+    args = parser.parse_args()
+
+    rank = args.rank
 
     ### prepare data ###
-    dataset = prepare_dataset(RAW_RECI, num_samples=50000)  # 50k subset to match compute plan
-    dataset = dataset.train_test_split(test_size=0.05)      # split into train and validation sets
+    train_raw, val_raw, _test_raw = build_splits(num_samples=args.num_samples)
+    train_ds = _format_for_sft(train_raw)
+    val_ds = _format_for_sft(val_raw)
+    print(f"Train: {len(train_ds)}  Val: {len(val_ds)}")
 
     ### setup quantization ###
     model_id = "google/gemma-2b-it"
 
-    # 4-bit precision
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
@@ -94,15 +57,15 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         quantization_config=bnb_config,
-        device_map="auto"
+        device_map="auto",
     )
 
     ### setup LoRA ###
     model = prepare_model_for_kbit_training(model)
     peft_config = LoraConfig(
         r=rank,
-        lora_alpha=16,
-        target_modules=["q_proj", "v_proj"],    # targeting attention blocks
+        lora_alpha=2 * rank,  # standard heuristic so alpha scales with rank
+        target_modules=["q_proj", "v_proj"],
         task_type="CAUSAL_LM",
         bias="none",
     )
@@ -110,10 +73,8 @@ def main():
     model.print_trainable_parameters()
 
     ### training args ###
-    # uses a batch size of 4, but waits to update weights until 4 sets of 4 recipes have been seen
-    # basically giving a batch size of 16
     training_args = TrainingArguments(
-        output_dir="./results",
+        output_dir=f"./results/checkpoints-r{rank}",
         per_device_train_batch_size=4,
         gradient_accumulation_steps=4,
         optim="paged_adamw_8bit",
@@ -121,15 +82,15 @@ def main():
         lr_scheduler_type="cosine",
         save_strategy="epoch",
         logging_steps=10,
-        num_train_epochs=1,             # try 1 for now
+        num_train_epochs=args.epochs,
         fp16=True,
     )
 
     ### train ###
     trainer = SFTTrainer(
         model=model,
-        train_dataset=dataset["train"],
-        eval_dataset=dataset["test"],
+        train_dataset=train_ds,
+        eval_dataset=val_ds,
         peft_config=peft_config,
         dataset_text_field="text",
         max_seq_length=512,
@@ -137,11 +98,12 @@ def main():
         args=training_args,
     )
 
-    print("--- starting training ---")
+    print(f"--- starting training (rank={rank}) ---")
     trainer.train()
 
-    trainer.save_model(f"./gemma-2b-recipe-adapter-r{rank}")  # save the model so we don't re-train
-    print("!!! training complete and model saved !!!")
+    trainer.save_model(f"./gemma-2b-recipe-adapter-r{rank}")
+    print(f"!!! training complete: ./gemma-2b-recipe-adapter-r{rank} !!!")
+
 
 if __name__ == "__main__":
     main()
