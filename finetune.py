@@ -1,5 +1,6 @@
 import argparse
 import torch
+import os
 from datasets import Dataset
 from transformers import (
     AutoTokenizer,
@@ -15,7 +16,6 @@ from inference import build_prompt
 
 # install deps with: pip install -U torch transformers peft trl bitsandbytes datasets pandas scikit-learn sacrebleu
 
-
 def _format_for_sft(ds):
     """Turn a split from `splits.build_splits` into a {'text': [...]} SFT dataset."""
     texts = [
@@ -24,12 +24,14 @@ def _format_for_sft(ds):
     ]
     return Dataset.from_dict({"text": texts})
 
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rank", type=int, default=4, help="QLoRA rank (ablation: 4, 16, 64)")
     parser.add_argument("--num_samples", type=int, default=50000)
     parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--batch_size", type=int, default=4, help="Per-device training batch size.")
+    parser.add_argument("--grad_accum", type=int, default=4, help="Gradient accumulation steps.")
+    parser.add_argument("--output_dir", type=str, default=".", help="Directory to save checkpoints and final adapter.")
     args = parser.parse_args()
 
     rank = args.rank
@@ -73,10 +75,11 @@ def main():
     model.print_trainable_parameters()
 
     ### training args ###
+    checkpoint_dir = os.path.join(args.output_dir, "results", f"checkpoints-r{rank}")
     training_args = TrainingArguments(
-        output_dir=f"./results/checkpoints-r{rank}",
-        per_device_train_batch_size=4,
-        gradient_accumulation_steps=4,
+        output_dir=checkpoint_dir,
+        per_device_train_batch_size=args.batch_size,
+        gradient_accumulation_steps=args.grad_accum,
         optim="paged_adamw_8bit",
         learning_rate=2e-4,
         lr_scheduler_type="cosine",
@@ -101,9 +104,9 @@ def main():
     print(f"--- starting training (rank={rank}) ---")
     trainer.train()
 
-    trainer.save_model(f"./gemma-2b-recipe-adapter-r{rank}")
-    print(f"!!! training complete: ./gemma-2b-recipe-adapter-r{rank} !!!")
-
+    final_adapter_dir = os.path.join(args.output_dir, f"gemma-2b-recipe-adapter-r{rank}")
+    trainer.save_model(final_adapter_dir)
+    print(f"!!! training complete: {final_adapter_dir} !!!")
 
 if __name__ == "__main__":
     main()

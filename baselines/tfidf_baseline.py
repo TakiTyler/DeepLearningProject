@@ -40,11 +40,12 @@ def build_retriever(train_ds):
     return generate_fn
 
 
-def main():
+def main(output_dir="."):
     train, _val, test = build_splits()
     gen_fn = build_retriever(train)
-    evaluate_model(gen_fn, test, run_name="tfidf", rank="-")
+    evaluate_model(gen_fn, test, run_name="tfidf", rank="-", output_dir=output_dir)
 
 
 if __name__ == "__main__":
+    # This allows running just this baseline from the command line.
     main()

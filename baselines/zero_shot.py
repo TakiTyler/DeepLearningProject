@@ -10,11 +10,11 @@ from inference import load_base, make_generate_fn
 from evaluate import evaluate_model
 
 
-def main():
+def main(output_dir="."):
     _, _, test = build_splits()
     model, tokenizer = load_base()
     gen_fn = make_generate_fn(model, tokenizer)
-    evaluate_model(gen_fn, test, run_name="zero_shot", rank="-")
+    evaluate_model(gen_fn, test, run_name="zero_shot", rank="-", output_dir=output_dir)
 
 
 if __name__ == "__main__":

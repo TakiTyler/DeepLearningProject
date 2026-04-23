@@ -7,6 +7,7 @@ table for the final report.
 Each QLoRA training is launched as a fresh Python subprocess because
 unloading a 4-bit model from VRAM mid-process is unreliable.
 """
+import argparse
 import subprocess
 import sys
 
@@ -15,33 +16,39 @@ from baselines.tfidf_baseline import main as tfidf_main
 from inference import evaluate_adapter
 
 RANKS = [4, 16, 64]
-
-
-def run_training(rank):
-    print(f"\n========== TRAIN rank={rank} ==========")
+# added flush = True to write the prints immediately. want to make sure these things are running
+def run_training(rank, output_dir):
+    print(f"\n========== TRAIN rank={rank} ==========", flush=True)
     subprocess.run(
-        [sys.executable, "finetune.py", "--rank", str(rank)],
+        [sys.executable, "finetune.py", "--rank", str(rank), "--output_dir", output_dir],
         check=True,
     )
 
 
-def run_eval(rank):
-    print(f"\n========== EVAL rank={rank} ==========")
-    evaluate_adapter(rank)
+def run_eval(rank, output_dir):
+    print(f"\n========== EVAL rank={rank} ==========", flush=True)
+    evaluate_adapter(rank, output_dir=output_dir)
 
 
 def main():
-    print("\n########## BASELINE: zero-shot ##########")
-    zero_shot_main()
+    parser = argparse.ArgumentParser(description="Run full ablation sweep.")
+    parser.add_argument("--output_dir", type=str, default=".", help="Base directory for all outputs.")
+    args = parser.parse_args()
 
-    print("\n########## BASELINE: tf-idf ##########")
-    tfidf_main()
+    print("\n########## BASELINE: zero-shot ##########", flush=True)
+    # The imported `main` functions for baselines are modified to accept output_dir
+    zero_shot_main(output_dir=args.output_dir)
+
+    print("\n########## BASELINE: tf-idf ##########", flush=True)
+    # Note: tfidf_baseline.py must also be modified to accept `output_dir`
+    # for its results to be saved in the correct location.
+    tfidf_main(output_dir=args.output_dir)
 
     for r in RANKS:
-        run_training(r)
-        run_eval(r)
+        run_training(r, args.output_dir)
+        run_eval(r, args.output_dir)
 
-    print("\nDone. See results/bleu_scores.csv")
+    print(f"\nDone. See results in {args.output_dir}/results/bleu_scores.csv", flush=True)
 
 
 if __name__ == "__main__":

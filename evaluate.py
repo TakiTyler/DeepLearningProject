@@ -9,28 +9,22 @@ import sacrebleu
 
 from inference import format_reference
 
-RESULTS_DIR = "results"
-SCORES_CSV = os.path.join(RESULTS_DIR, "bleu_scores.csv")
-SAMPLES_DIR = os.path.join(RESULTS_DIR, "samples")
+
+def _ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
 
 
-def _ensure_dirs():
-    os.makedirs(SAMPLES_DIR, exist_ok=True)
-
-
-def _append_score(row):
-    _ensure_dirs()
-    is_new = not os.path.exists(SCORES_CSV)
-    with open(SCORES_CSV, "a", newline="", encoding="utf-8") as f:
+def _append_score(row, scores_csv_path):
+    is_new = not os.path.exists(scores_csv_path)
+    with open(scores_csv_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if is_new:
             writer.writerow(["run_name", "rank", "bleu", "mean_output_len", "num_eval"])
         writer.writerow(row)
 
 
-def _write_samples(run_name, samples):
-    _ensure_dirs()
-    path = os.path.join(SAMPLES_DIR, f"{run_name}.txt")
+def _write_samples(run_name, samples, samples_dir):
+    path = os.path.join(samples_dir, f"{run_name}.txt")
     with open(path, "w", encoding="utf-8") as f:
         for i, s in enumerate(samples):
             f.write(f"=== sample {i+1} ===\n")
@@ -39,7 +33,7 @@ def _write_samples(run_name, samples):
             f.write("GENERATED:\n" + s["generated"] + "\n\n")
 
 
-def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, num_samples_to_log=5):
+def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, num_samples_to_log=5, output_dir="."):
     """Run `generate_fn` on the first `num_eval` examples and log BLEU.
 
     Args:
@@ -47,7 +41,13 @@ def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, 
         test_dataset: HF Dataset with columns name, ingredients, steps
         run_name: identifier for the row in bleu_scores.csv
         rank: "-" for baselines, integer for QLoRA runs
+        output_dir: Base directory for results.
     """
+    results_dir = os.path.join(output_dir, "results")
+    samples_dir = os.path.join(results_dir, "samples")
+    scores_csv_path = os.path.join(results_dir, "bleu_scores.csv")
+    _ensure_dir(samples_dir)
+
     n = min(num_eval, len(test_dataset))
     hypotheses = []
     references = []
@@ -75,7 +75,7 @@ def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, 
     mean_len = sum(len(h.split()) for h in hypotheses) / max(1, len(hypotheses))
 
     print(f"[{run_name}] BLEU = {bleu.score:.2f}  mean_len = {mean_len:.1f}")
-    _append_score([run_name, rank, f"{bleu.score:.4f}", f"{mean_len:.2f}", n])
-    _write_samples(run_name, samples)
+    _append_score([run_name, rank, f"{bleu.score:.4f}", f"{mean_len:.2f}", n], scores_csv_path)
+    _write_samples(run_name, samples, samples_dir)
 
     return {"run_name": run_name, "bleu": bleu.score, "mean_len": mean_len}

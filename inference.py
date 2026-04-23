@@ -5,6 +5,7 @@ ingredient lists become Gemma chat-template prompts — `finetune.py` and
 every evaluator imports from here so training and inference never drift.
 """
 import argparse
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
@@ -67,10 +68,10 @@ def load_base():
     return model, tokenizer
 
 
-def load_adapter(rank):
+def load_adapter(rank, output_dir="."):
     """Load the base 4-bit Gemma and attach the LoRA adapter for the given rank."""
     model, tokenizer = load_base()
-    adapter_path = f"./gemma-2b-recipe-adapter-r{rank}"
+    adapter_path = os.path.join(output_dir, f"gemma-2b-recipe-adapter-r{rank}")
     model = PeftModel.from_pretrained(model, adapter_path)
     model.eval()
     return model, tokenizer
@@ -102,21 +103,22 @@ def make_generate_fn(model, tokenizer):
     return gen
 
 
-def evaluate_adapter(rank, num_eval=200):
+def evaluate_adapter(rank, num_eval=200, output_dir="."):
     """Load adapter for `rank`, run BLEU on the held-out test split."""
     from evaluate import evaluate_model
     from splits import build_splits
 
     _, _, test = build_splits()
-    model, tokenizer = load_adapter(rank)
+    model, tokenizer = load_adapter(rank, output_dir=output_dir)
     gen_fn = make_generate_fn(model, tokenizer)
     return evaluate_model(gen_fn, test, run_name=f"qlora_r{rank}",
-                          rank=rank, num_eval=num_eval)
+                          rank=rank, num_eval=num_eval,
+                          output_dir=output_dir)
 
 
-def _interactive(rank):
+def _interactive(rank, output_dir="."):
     print(f"Loading adapter r={rank}...")
-    model, tokenizer = load_adapter(rank)
+    model, tokenizer = load_adapter(rank, output_dir=output_dir)
     print("Ready. Enter comma-separated ingredients (or 'quit').")
     while True:
         try:
@@ -134,5 +136,6 @@ def _interactive(rank):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--rank", type=int, default=16)
+    parser.add_argument("--output_dir", type=str, default=".", help="Directory where the adapter is saved.")
     args = parser.parse_args()
-    _interactive(args.rank)
+    _interactive(args.rank, output_dir=args.output_dir)
