@@ -86,6 +86,7 @@ def generate_recipe(model, tokenizer, ingredients, max_new_tokens=300):
             max_new_tokens=max_new_tokens,
             do_sample=False,
             pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=tokenizer.eos_token_id, # Added stopping criteria
         )
     # strip the prompt tokens; keep only the model's completion
     generated = out[0][inputs["input_ids"].shape[1]:]

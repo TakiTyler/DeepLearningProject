@@ -23,6 +23,11 @@ def run_training(rank, output_dir):
         [sys.executable, "finetune.py", "--rank", str(rank), "--output_dir", output_dir],
         check=True,
     )
+    # USE THIS IF YOU WANNA TRAIN FOR MORE EPOCHS, takes ~30min per epoch
+    # subprocess.run(
+    #     [sys.executable, "finetune.py", "--rank", str(rank), "--output_dir", output_dir, "--epochs", "3"],
+    #     check=True,
+    # )
 
 
 def run_eval(rank, output_dir):
@@ -36,20 +41,16 @@ def main():
     args = parser.parse_args()
 
     print("\n########## BASELINE: zero-shot ##########", flush=True)
-    # The imported `main` functions for baselines are modified to accept output_dir
-    zero_shot_main(output_dir=args.output_dir)
+    # zero_shot_main(output_dir=args.output_dir)
 
     print("\n########## BASELINE: tf-idf ##########", flush=True)
-    # Note: tfidf_baseline.py must also be modified to accept `output_dir`
-    # for its results to be saved in the correct location.
-    tfidf_main(output_dir=args.output_dir)
+    # tfidf_main(output_dir=args.output_dir)
 
     for r in RANKS:
         run_training(r, args.output_dir)
         run_eval(r, args.output_dir)
 
     print(f"\nDone. See results in {args.output_dir}/results/bleu_scores.csv", flush=True)
-
 
 if __name__ == "__main__":
     main()
