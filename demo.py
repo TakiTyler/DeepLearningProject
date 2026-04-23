@@ -39,10 +39,8 @@ def demo_cleaning(df):
     print("VALID:", is_valid_recipe(ingredients, steps))
     print()
 
-# if __name__ == '__main__':
-    # df = load_csv(RAW_RECI)
-    '''
+if __name__ == '__main__':
+    df = load_csv(RAW_RECI)
     # demo parsing and cleaning on first recipe
     demo_parsing(df)
     demo_cleaning(df)
-    '''
