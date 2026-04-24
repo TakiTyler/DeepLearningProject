@@ -20,7 +20,7 @@ RANKS = [4, 16, 64]
 def run_training(rank, output_dir):
     print(f"\n========== TRAIN rank={rank} ==========", flush=True)
     subprocess.run(
-        [sys.executable, "finetune.py", "--rank", str(rank), "--output_dir", output_dir],
+        [sys.executable, "finetune.py", "--rank", str(rank), "--output_dir", output_dir, "--num_samples", "10000"], # reducing samples to increase runtime.
         check=True,
     )
     # USE THIS IF YOU WANNA TRAIN FOR MORE EPOCHS, takes ~30min per epoch
