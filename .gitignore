@@ -11,3 +11,6 @@ data
 # ignore training/eval outputs
 results
 gemma-2b-recipe-adapter-r*
+
+# ignore the token
+token.txt

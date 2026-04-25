@@ -45,7 +45,6 @@ def main():
 
     print("\n########## BASELINE: tf-idf ##########", flush=True)
     # tfidf_main(output_dir=args.output_dir)
-
     for r in RANKS:
         run_training(r, args.output_dir)
         run_eval(r, args.output_dir)

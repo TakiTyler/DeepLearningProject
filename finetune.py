@@ -27,7 +27,7 @@ def _format_for_sft(ds):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rank", type=int, default=4, help="QLoRA rank (ablation: 4, 16, 64)")
-    parser.add_argument("--num_samples", type=int, default=50000)
+    parser.add_argument("--num_samples", type=int, default=5000)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch_size", type=int, default=4, help="Per-device training batch size.")
     parser.add_argument("--grad_accum", type=int, default=4, help="Gradient accumulation steps.")
