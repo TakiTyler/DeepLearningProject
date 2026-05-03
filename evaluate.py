@@ -5,7 +5,7 @@ so a single function compares all 5 runs head-to-head.
 """
 import os
 import csv
-import sacrebleu
+from rouge_score import rouge_scorer
 
 from inference import format_reference
 
@@ -19,7 +19,7 @@ def _append_score(row, scores_csv_path):
     with open(scores_csv_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if is_new:
-            writer.writerow(["run_name", "rank", "bleu", "mean_output_len", "num_eval"])
+            writer.writerow(["run_name", "rank", "rouge1", "rouge2", "rougeL", "mean_output_len", "num_eval"])
         writer.writerow(row)
 
 
@@ -45,7 +45,7 @@ def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, 
     """
     results_dir = os.path.join(output_dir, "results")
     samples_dir = os.path.join(results_dir, "samples")
-    scores_csv_path = os.path.join(results_dir, "bleu_scores.csv")
+    scores_csv_path = os.path.join(results_dir, "evaluation_scores.csv")
     _ensure_dir(samples_dir)
 
     n = min(num_eval, len(test_dataset))
@@ -53,7 +53,7 @@ def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, 
     references = []
     samples = []
 
-    print(f"[{run_name}] evaluating on {n} examples...")
+    print(f"[{run_name}] evaluating on {n} examples...", flush=True)
     for i in range(n):
         ex = test_dataset[i]
         hyp = generate_fn(ex["ingredients"])
@@ -69,13 +69,25 @@ def evaluate_model(generate_fn, test_dataset, run_name, rank="-", num_eval=200, 
             })
 
         if (i + 1) % 25 == 0:
-            print(f"  {i+1}/{n}")
+            print(f"  {i+1}/{n}", flush=True)
 
-    bleu = sacrebleu.corpus_bleu(hypotheses, [references])
+    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    r1_scores, r2_scores, rl_scores = [], [], []
+
+    for hyp, ref in zip(hypotheses, references):
+        scores = scorer.score(ref, hyp)
+        r1_scores.append(scores['rouge1'].fmeasure)
+        r2_scores.append(scores['rouge2'].fmeasure)
+        rl_scores.append(scores['rougeL'].fmeasure)
+
+    avg_r1 = sum(r1_scores) / max(1, len(r1_scores))
+    avg_r2 = sum(r2_scores) / max(1, len(r2_scores))
+    avg_rl = sum(rl_scores) / max(1, len(rl_scores))
+
     mean_len = sum(len(h.split()) for h in hypotheses) / max(1, len(hypotheses))
 
-    print(f"[{run_name}] BLEU = {bleu.score:.2f}  mean_len = {mean_len:.1f}")
-    _append_score([run_name, rank, f"{bleu.score:.4f}", f"{mean_len:.2f}", n], scores_csv_path)
+    print(f"[{run_name}] ROUGE-1={avg_r1:.4f} ROUGE-2={avg_r2:.4f} ROUGE-L={avg_rl:.4f} mean_len={mean_len:.1f}", flush=True)
+    _append_score([run_name, rank, f"{avg_r1:.4f}", f"{avg_r2:.4f}", f"{avg_rl:.4f}", f"{mean_len:.2f}", n], scores_csv_path)
     _write_samples(run_name, samples, samples_dir)
 
-    return {"run_name": run_name, "bleu": bleu.score, "mean_len": mean_len}
+    return {"run_name": run_name, "rouge1": avg_r1, "mean_len": mean_len}

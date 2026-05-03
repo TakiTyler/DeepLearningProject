@@ -7,10 +7,12 @@ data
 # ignore env files
 .env
 .venv
+.slurm
 
 # ignore training/eval outputs
 results
 gemma-2b-recipe-adapter-r*
+ablation_outputs
 
 # ignore the token
 token.txt

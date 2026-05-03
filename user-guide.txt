@@ -1,0 +1,15 @@
+BEFORE RUNNING A SLURM FILE:
+
+  dos2unix filename
+  
+USE THIS TO ENTER THE VENV:
+
+  source venv/bin/activate
+  
+TO CHECK RUN STATUS:
+
+  squeue -u username
+  
+TO RUN A FILE:
+
+  sbatch run_experiments.slurm

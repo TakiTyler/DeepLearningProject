@@ -1,7 +1,7 @@
 """Full ablation sweep.
 
 Runs the two baselines and three QLoRA ranks end-to-end, producing a
-single `results/bleu_scores.csv` with one row per run — the headline
+single `results/evaluation_scores.csv` with one row per run — the headline
 table for the final report.
 
 Each QLoRA training is launched as a fresh Python subprocess because
@@ -36,20 +36,35 @@ def run_eval(rank, output_dir):
 
 
 def main():
+    import torch
+    print("\n========== HARDWARE CHECK ==========", flush=True)
+    print(f"PyTorch version: {torch.__version__}", flush=True)
+    print(f"CUDA available: {torch.cuda.is_available()}", flush=True)
+    if torch.cuda.is_available():
+        print(f"GPU detected: {torch.cuda.get_device_name(0)}", flush=True)
+    else:
+        print("WARNING: No GPU detected! Inference will run on CPU and be extremely slow.", flush=True)
+    print("====================================\n", flush=True)
+
     parser = argparse.ArgumentParser(description="Run full ablation sweep.")
     parser.add_argument("--output_dir", type=str, default=".", help="Base directory for all outputs.")
+    parser.add_argument("--skip_baselines", action="store_true", help="Skip baselines to only run QLoRA sweeps.")
     args = parser.parse_args()
 
-    print("\n########## BASELINE: zero-shot ##########", flush=True)
-    # zero_shot_main(output_dir=args.output_dir)
+    if not args.skip_baselines:
+        print("\n########## BASELINE: zero-shot ##########", flush=True)
+        zero_shot_main(output_dir=args.output_dir)
 
-    print("\n########## BASELINE: tf-idf ##########", flush=True)
-    # tfidf_main(output_dir=args.output_dir)
+        print("\n########## BASELINE: tf-idf ##########", flush=True)
+        tfidf_main(output_dir=args.output_dir)
+    else:
+        print("\n########## SKIPPING BASELINES ##########", flush=True)
+
     for r in RANKS:
         run_training(r, args.output_dir)
         run_eval(r, args.output_dir)
 
-    print(f"\nDone. See results in {args.output_dir}/results/bleu_scores.csv", flush=True)
+    print(f"\nDone. See results in {args.output_dir}/results/evaluation_scores.csv", flush=True)
 
 if __name__ == "__main__":
     main()

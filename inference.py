@@ -37,7 +37,7 @@ def build_prompt(ingredients, target_name=None, target_steps=None):
     return (
         user_turn
         + f"**Recipe Name:** {target_name}\n"
-        + f"**Steps:**\n{steps_str}\n<end_of_turn>"
+        + f"**Steps:**\n{steps_str}\n<end_of_turn><eos>"
     )
 
 
@@ -62,7 +62,10 @@ def load_base():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
     tokenizer.padding_side = "right"
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID, quantization_config=_quant_config(), device_map="auto"
+        MODEL_ID,
+        quantization_config=_quant_config(),
+        device_map="auto",
+        torch_dtype=torch.float16,
     )
     model.eval()
     return model, tokenizer
@@ -77,7 +80,7 @@ def load_adapter(rank, output_dir="."):
     return model, tokenizer
 
 
-def generate_recipe(model, tokenizer, ingredients, max_new_tokens=300):
+def generate_recipe(model, tokenizer, ingredients, max_new_tokens=512):
     prompt = build_prompt(ingredients)
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():

@@ -1,6 +1,7 @@
 import argparse
 import torch
 import os
+import pandas as pd
 from datasets import Dataset
 from transformers import (
     AutoTokenizer,
@@ -14,7 +15,7 @@ from trl import SFTTrainer
 from splits import build_splits
 from inference import build_prompt
 
-# install deps with: pip install -U torch transformers peft trl bitsandbytes datasets pandas scikit-learn sacrebleu
+# install deps with: pip install -U torch "transformers<4.45.0" "accelerate<0.34.0" peft "trl<0.12.0" bitsandbytes datasets pandas scikit-learn rouge-score "liger-kernel<0.3.0"
 
 def _format_for_sft(ds):
     """Turn a split from `splits.build_splits` into a {'text': [...]} SFT dataset."""
@@ -27,8 +28,8 @@ def _format_for_sft(ds):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rank", type=int, default=4, help="QLoRA rank (ablation: 4, 16, 64)")
-    parser.add_argument("--num_samples", type=int, default=5000)
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--num_samples", type=int, default=50000)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=4, help="Per-device training batch size.")
     parser.add_argument("--grad_accum", type=int, default=4, help="Gradient accumulation steps.")
     parser.add_argument("--output_dir", type=str, default=".", help="Directory to save checkpoints and final adapter.")
@@ -59,7 +60,8 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         quantization_config=bnb_config,
-        device_map="auto",
+        device_map={"": 0},
+        torch_dtype=torch.float16,
     )
 
     ### setup LoRA ###
@@ -84,6 +86,7 @@ def main():
         learning_rate=2e-4,
         lr_scheduler_type="cosine",
         save_strategy="epoch",
+        evaluation_strategy="epoch",
         logging_steps=10,
         num_train_epochs=args.epochs,
         fp16=True,
@@ -103,6 +106,12 @@ def main():
 
     print(f"--- starting training (rank={rank}) ---")
     trainer.train()
+
+    ### save training and validation metrics to CSV ###
+    history = trainer.state.log_history
+    log_df = pd.DataFrame(history)
+    log_csv_path = os.path.join(args.output_dir, "results", f"training_logs_r{rank}.csv")
+    log_df.to_csv(log_csv_path, index=False)
 
     final_adapter_dir = os.path.join(args.output_dir, f"gemma-2b-recipe-adapter-r{rank}")
     trainer.save_model(final_adapter_dir)
