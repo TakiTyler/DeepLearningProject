@@ -13,6 +13,21 @@ To evaluate the optimal training configuration, the project conducts an **ablati
 
 ---
 
+## Dataset Setup
+
+Since the dataset filesize is larger than what github typically allows, we had to exclude the data from the repository.
+
+Follow these steps to ensure the same folder structure as we used:
+
+1. **Download the Kaggle dataset:**
+    [Kaggle Dataset](https://www.kaggle.com/datasets/shuyangli94/food-com-recipes-and-user-interactions)
+
+2. **Create a 'data' folder in the root directory of your project.**
+
+3. **Place the dataset within the 'data' folder.**
+
+---
+
 ## Environment Setup
 
 Due to library version issues, this project relies on strictly pinned dependency versions to ensure compatibility between `transformers`, `accelerate`, 4-bit quantization, and `liger-kernel`.
