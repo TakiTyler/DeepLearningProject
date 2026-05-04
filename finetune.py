@@ -15,7 +15,9 @@ from trl import SFTTrainer
 from splits import build_splits
 from inference import build_prompt
 
-# install deps with: pip install -U torch "transformers<4.45.0" "accelerate<0.34.0" peft "trl<0.12.0" bitsandbytes datasets pandas scikit-learn rouge-score "liger-kernel<0.3.0"
+# install deps with:
+# pip install -U torch --index-url https://download.pytorch.org/whl/cu121
+# pip install -U "transformers<4.45.0" "accelerate<0.34.0" peft "trl<0.12.0" bitsandbytes datasets pandas scikit-learn rouge-score "liger-kernel<0.3.0"
 
 def _format_for_sft(ds):
     """Turn a split from `splits.build_splits` into a {'text': [...]} SFT dataset."""
